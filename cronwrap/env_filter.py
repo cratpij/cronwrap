@@ -70,3 +70,29 @@ def safe_env(config: Optional[EnvFilterConfig] = None) -> Dict[str, str]:
     if config is None:
         config = EnvFilterConfig()
     return filter_env(dict(os.environ), config)
+
+
+def stripped_keys(
+    env: Dict[str, str],
+    config: EnvFilterConfig,
+) -> List[str]:
+    """Return the list of keys that *would* be removed or redacted by ``filter_env``.
+
+    Useful for logging or auditing which variables were suppressed without
+    exposing their values.
+
+    Args:
+        env: The environment mapping to inspect.
+        config: The filter configuration to apply.
+
+    Returns:
+        A sorted list of variable names that are sensitive or excluded by the
+        allowlist.
+    """
+    removed: List[str] = []
+    for key in env:
+        if config.allowlist is not None and key not in config.allowlist:
+            removed.append(key)
+        elif is_sensitive(key, config.strip_vars):
+            removed.append(key)
+    return sorted(removed)
