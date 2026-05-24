@@ -32,6 +32,18 @@ class RunnerConfig:
     env: Optional[dict] = None
 
 
+def _make_timeout_result(config: RunnerConfig, attempt: int, start_time: float, exc: subprocess.TimeoutExpired) -> JobResult:
+    """Build a JobResult representing a timed-out attempt."""
+    return JobResult(
+        command=config.command,
+        returncode=-1,
+        stdout="",
+        stderr=f"TimeoutExpired: {exc}",
+        attempts=attempt,
+        elapsed=time.monotonic() - start_time,
+    )
+
+
 def run_job(config: RunnerConfig) -> JobResult:
     """Execute a shell command with optional retry logic.
 
@@ -59,14 +71,7 @@ def run_job(config: RunnerConfig) -> JobResult:
             )
         except subprocess.TimeoutExpired as exc:
             logger.warning("Command timed out on attempt %d", attempt)
-            last_result = JobResult(
-                command=config.command,
-                returncode=-1,
-                stdout="",
-                stderr=f"TimeoutExpired: {exc}",
-                attempts=attempt,
-                elapsed=time.monotonic() - start_time,
-            )
+            last_result = _make_timeout_result(config, attempt, start_time, exc)
         else:
             last_result = JobResult(
                 command=config.command,
@@ -83,7 +88,7 @@ def run_job(config: RunnerConfig) -> JobResult:
 
         if attempt < max_attempts:
             logger.warning(
-                "Attempt %d failed (exit %d). Retrying in %.1fs…",
+                "Attempt %d failed (exit %d). Retrying in %.1fs\u2026",
                 attempt,
                 last_result.returncode,
                 config.retry_delay,
